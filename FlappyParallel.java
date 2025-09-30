@@ -319,8 +319,10 @@ class GamePanel extends JPanel implements KeyListener {
             currentQ = null; currentOpts = null; correctIdx = -1;
             inQuiz.set(false);
         } else {
-            // Errou → game over
+            // Errou - game over
             gameOver.set(true);
+            currentQ = null; currentOpts = null; correctIdx = -1;
+            inQuiz.set(false);
         }
     }
 
@@ -417,40 +419,100 @@ class GamePanel extends JPanel implements KeyListener {
     }
 
     private void paintQuizOverlay(Graphics2D g2) {
-        // fundo semitransparente
-        g2.setColor(new Color(0, 0, 0, 160));
+        g2.setColor(new Color(0, 0, 0, 170));
         g2.fillRect(0, 0, W, H);
 
-        // cartão central
-        int cardW = (int)(W * 0.8), cardH = (int)(H * 0.6);
-        int cx = (W - cardW)/2, cy = (H - cardH)/2;
-        g2.setColor(new Color(245,245,255));
-        g2.fillRoundRect(cx, cy, cardW, cardH, 20, 20);
-        g2.setColor(new Color(40,40,60));
-        g2.drawRoundRect(cx, cy, cardW, cardH, 20, 20);
+        int cardW = (int) (W * 0.8);
+        int cardH = Math.min((int) (H * 0.85), H - 40);
+        int cx = (W - cardW) / 2;
+        int cy = (H - cardH) / 2;
 
-        // título
-        g2.setColor(new Color(20,25,40));
+        g2.setColor(new Color(246, 247, 255));
+        g2.fillRoundRect(cx, cy, cardW, cardH, 24, 24);
+        Stroke previousStroke = g2.getStroke();
+        g2.setStroke(new BasicStroke(2f));
+        g2.setColor(new Color(60, 68, 128));
+        g2.drawRoundRect(cx, cy, cardW, cardH, 24, 24);
+        g2.setStroke(previousStroke);
+
+        int padding = 32;
+        int columnGap = 18;
+        int optHeight = 70;
+        int optGapY = 16;
+        int instructionY = cy + cardH - padding - 12;
+        int maxOptionsBottom = instructionY - 36;
+        int optionsAreaHeight = optHeight * 2 + optGapY;
+        int titleY = cy + padding + 30;
+
         g2.setFont(fTitle);
-        String header = "Checkpoint: responda para continuar!";
-        drawCentered(g2, header, cy + 50);
+        g2.setColor(new Color(26, 32, 58));
+        drawCentered(g2, "Checkpoint: responda para continuar!", titleY);
 
-        // pergunta
-        g2.setFont(fBig);
-        String q = (currentQ != null) ? currentQ.text : "";
-        drawWrapped(g2, q, cx + 30, cy + 95, cardW - 60, 26);
-
-        // alternativas
-        g2.setFont(fSmall.deriveFont(18f));
-        String[] labels = {"[1] A", "[2] B", "[3] C", "[4] D"};
-        int oy = cy + 185;
-        for (int i = 0; i < 4; i++) {
-            String line = labels[i] + "  " + (currentOpts != null ? currentOpts[i] : "");
-            g2.drawString(line, cx + 40, oy + i*40);
+        int questionTop = titleY + 26;
+        int questionDesired = Math.max(120, (int) (cardH * 0.32));
+        int questionMaxHeight = maxOptionsBottom - optionsAreaHeight - questionTop - 24;
+        int questionBoxHeight;
+        if (questionMaxHeight <= 0) {
+            questionBoxHeight = 0;
+        } else if (questionMaxHeight < 110) {
+            questionBoxHeight = questionMaxHeight;
+        } else {
+            questionBoxHeight = Math.max(110, Math.min(questionDesired, questionMaxHeight));
         }
 
-        g2.setColor(new Color(60,60,90));
-        g2.drawString("Use 1–4 ou A–D para responder. Errou = game over.", cx + 40, cy + cardH - 30);
+        int questionBoxX = cx + padding;
+        int questionBoxW = cardW - padding * 2;
+        g2.setColor(new Color(230, 234, 255));
+        g2.fillRoundRect(questionBoxX, questionTop, questionBoxW, questionBoxHeight, 18, 18);
+        g2.setColor(new Color(100, 112, 170));
+        g2.drawRoundRect(questionBoxX, questionTop, questionBoxW, questionBoxHeight, 18, 18);
+
+        g2.setFont(fBig);
+        g2.setColor(new Color(26, 32, 58));
+        String questionText = (currentQ != null) ? currentQ.text : "";
+        drawWrapped(g2, questionText, questionBoxX + 22, questionTop + 36, questionBoxW - 44, 26);
+
+        int optionsTop = questionTop + questionBoxHeight + 24;
+        if (optionsTop + optionsAreaHeight > maxOptionsBottom) {
+            optionsTop = Math.max(questionTop + 24, maxOptionsBottom - optionsAreaHeight);
+        }
+
+        int optionsLeft = questionBoxX;
+        int optionsWidth = questionBoxW;
+        int columnWidth = (optionsWidth - columnGap) / 2;
+        Font optLabelFont = fSmall.deriveFont(Font.BOLD, 18f);
+        Font optTextFont = fSmall.deriveFont(16f);
+        String[] labels = {"[1] A", "[2] B", "[3] C", "[4] D"};
+        for (int i = 0; i < 4; i++) {
+            int col = i % 2;
+            int row = i / 2;
+            int x = optionsLeft + col * (columnWidth + columnGap);
+            int y = optionsTop + row * (optHeight + optGapY);
+            String optionText = (currentOpts != null) ? currentOpts[i] : "";
+            drawOptionCard(g2, labels[i], optionText, x, y, columnWidth, optHeight, optLabelFont, optTextFont);
+        }
+
+        g2.setFont(fSmall.deriveFont(Font.PLAIN, 16f));
+        g2.setColor(new Color(74, 82, 122));
+        drawCentered(g2, "Use 1-4 ou A-D para responder. Errou = game over.", instructionY);
+    }
+
+    private void drawOptionCard(Graphics2D g2, String label, String text, int x, int y, int width, int height, Font labelFont, Font textFont) {
+        int arc = 18;
+        int innerPad = 18;
+        g2.setColor(new Color(244, 245, 255));
+        g2.fillRoundRect(x, y, width, height, arc, arc);
+        g2.setColor(new Color(162, 172, 210));
+        g2.drawRoundRect(x, y, width, height, arc, arc);
+
+        g2.setFont(labelFont);
+        g2.setColor(new Color(46, 52, 94));
+        int labelBaseline = y + 26;
+        g2.drawString(label, x + innerPad, labelBaseline);
+
+        g2.setFont(textFont);
+        g2.setColor(new Color(58, 64, 102));
+        drawWrapped(g2, text, x + innerPad, labelBaseline + 20, width - innerPad * 2, 20);
     }
 
     private void drawCentered(Graphics2D g2, String msg, int y) {
